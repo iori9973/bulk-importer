@@ -213,7 +213,8 @@ namespace BulkImporter
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
 
-            bool canEdit = !_queue.IsImporting || entry.Status == ImportStatus.Pending;
+            bool isCurrent = entry == _queue.CurrentEntry;
+            bool canEdit = !_queue.IsImporting || !isCurrent;
 
             EditorGUI.BeginDisabledGroup(!canEdit);
             entry.Enabled = EditorGUILayout.Toggle(entry.Enabled, GUILayout.Width(16));
@@ -232,7 +233,7 @@ namespace BulkImporter
             GUILayout.Label(statusLabel, GUILayout.Width(120));
             GUI.contentColor = prevColor;
 
-            EditorGUI.BeginDisabledGroup(_queue.IsImporting && entry.Status == ImportStatus.Importing);
+            EditorGUI.BeginDisabledGroup(isCurrent);
             if (GUILayout.Button("×", GUILayout.Width(24)))
             {
                 PackageQueue.DeleteTemp(entry);
@@ -279,7 +280,7 @@ namespace BulkImporter
             foreach (var entry in _queue.Entries)
             {
                 if (entry.Enabled)
-                    entry.Status = ImportStatus.Pending;
+                    entry.Status = ImportStatus.Importing;
             }
             _queue.Start();
         }

@@ -39,6 +39,7 @@ namespace BulkImporter
         [NonSerialized] private PackageEntry _currentEntry;
 
         public bool IsImporting => _isImporting;
+        public PackageEntry CurrentEntry => _currentEntry;
 
         public void Start()
         {
@@ -64,7 +65,7 @@ namespace BulkImporter
             PackageEntry next = null;
             foreach (var entry in Entries)
             {
-                if (entry.Enabled && entry.Status == ImportStatus.Pending)
+                if (entry.Enabled && entry.Status == ImportStatus.Importing)
                 {
                     next = entry;
                     break;
@@ -80,7 +81,6 @@ namespace BulkImporter
             }
 
             _currentEntry = next;
-            _currentEntry.Status = ImportStatus.Importing;
             OnUpdate?.Invoke();
 
             // ドメインリロード対策：インポート開始時にエントリを記録
