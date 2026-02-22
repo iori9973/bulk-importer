@@ -1,0 +1,36 @@
+name: Build VPM Listing (manual)
+
+# リリース後に listing 更新が失敗した場合に手動で再実行するワークフロー
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-listing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Switch to main and pull latest
+        run: |
+          git checkout main
+          git pull origin main
+
+      - name: Build VPM listing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/build_listing.py
+
+      - name: Commit updated listing
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.json
+          git diff --staged --quiet || git commit -m "Update VPM listing [skip ci]"
+          git push origin main

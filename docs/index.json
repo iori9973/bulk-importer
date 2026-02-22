@@ -1,0 +1,11 @@
+{
+  "name": "Bulk Importer",
+  "id": "com.bulk-importer.repo",
+  "url": "https://iori9973.github.io/bulk-importer/index.json",
+  "author": "iori9973",
+  "packages": {
+    "com.bulk-importer": {
+      "versions": {}
+    }
+  }
+}

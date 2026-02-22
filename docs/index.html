@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bulk Importer</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 60px auto; padding: 0 16px; }
+    code { background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-size: 0.9em; word-break: break-all; }
+    .btn {
+      display: inline-block; margin-top: 16px; padding: 12px 24px;
+      background: #5865F2; color: #fff; border-radius: 8px;
+      text-decoration: none; font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bulk Importer</h1>
+  <p>.unitypackage ファイルを複数選択して一括インポートする Unity Editor 拡張です。</p>
+
+  <h2>VCC へのインストール</h2>
+  <p>以下のボタンをクリックするか、URL を VCC の Add Repository に貼り付けてください。</p>
+
+  <a class="btn"
+     href="vcc://vpm/addRepo?url=https://iori9973.github.io/bulk-importer/index.json">
+    Add to VCC
+  </a>
+
+  <p>または手動で追加：<br>
+    <code>https://iori9973.github.io/bulk-importer/index.json</code>
+  </p>
+
+  <h2>使い方</h2>
+  <p>メニューから <strong>Tools → Bulk Importer</strong> でウィンドウを開き、<code>.unitypackage</code> をドラッグ＆ドロップして一括インポートできます。</p>
+</body>
+</html>
