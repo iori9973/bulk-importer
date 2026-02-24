@@ -41,3 +41,6 @@ Tests/obj/
 # OS
 .DS_Store
 Thumbs.db
+
+# Development / test artifacts
+sample/

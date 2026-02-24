@@ -27,35 +27,54 @@ namespace BulkImporter
 
         private void RecoverFromDomainReload()
         {
-            string importingKey = EditorPrefs.GetString(PackageQueue.KeyImportingEntry, "");
-            if (!string.IsNullOrEmpty(importingKey))
+            // シリアライズされたインデックスで復元
+            int idx = _queue.ImportingEntryIndex;
+            if (idx >= 0 && idx < _queue.Entries.Count)
             {
-                // ドメインリロード前にインポート中だったエントリを特定して完了扱いにする
-                // （ドメインリロードはパッケージのスクリプト取り込み後に発生するため
-                //   インポート自体は成功していると推定できる）
-                EditorPrefs.DeleteKey(PackageQueue.KeyImportingEntry);
-                foreach (var entry in _queue.Entries)
+                var entry = _queue.Entries[idx];
+                if (entry.Status == ImportStatus.Importing)
                 {
-                    if (entry.Status != ImportStatus.Importing) continue;
-                    if (entry.SourceKey == importingKey || entry.DisplayName == importingKey)
-                    {
-                        entry.Status = ImportStatus.Done;
-                        PackageQueue.DeleteTemp(entry);
-                        break;
-                    }
+                    entry.Status = ImportStatus.Done;
+                    PackageQueue.DeleteTemp(entry);
                 }
+                _queue.ImportingEntryIndex = -1;
             }
 
             // 上記で処理されなかった Importing エントリは待機中に戻す
             foreach (var entry in _queue.Entries)
             {
-                if (entry.Status == ImportStatus.Importing)
+                if (!entry.IsVpmEntry && entry.Status == ImportStatus.Importing)
                     entry.Status = ImportStatus.Pending;
+            }
+
+            // VPM パッケージのインストール状態を更新
+            UpdateVpmEntryStatuses();
+        }
+
+        private void UpdateVpmEntryStatuses()
+        {
+            var packagesDir = Path.GetFullPath(
+                Path.Combine(Application.dataPath, "..", "Packages"));
+
+            foreach (var entry in _queue.Entries)
+            {
+                if (!entry.IsVpmEntry || entry.Status == ImportStatus.Done) continue;
+                if (Directory.Exists(Path.Combine(packagesDir, entry.VpmPackageId)))
+                    entry.Status = ImportStatus.Done;
             }
         }
 
         private void OnDisable()
         {
+            // ドメインリロード前にも呼ばれるため AbortForDomainReload を使用
+            // （ImportingEntryIndex を保持したままシリアライズに委ねる）
+            if (_queue.IsImporting)
+                _queue.AbortForDomainReload();
+        }
+
+        private void OnDestroy()
+        {
+            // ウィンドウが実際に閉じられた場合のみ呼ばれる（ドメインリロードでは呼ばれない）
             if (_queue.IsImporting)
                 _queue.Stop();
         }
@@ -179,7 +198,9 @@ namespace BulkImporter
         {
             EditorGUILayout.BeginHorizontal();
 
-            int count = _queue.Entries.Count;
+            int count = 0;
+            foreach (var e in _queue.Entries)
+                if (!e.IsVpmEntry) count++;
             GUILayout.Label($"{count} 件", GUILayout.Width(50));
             GUILayout.FlexibleSpace();
 
@@ -203,7 +224,17 @@ namespace BulkImporter
             for (int i = _queue.Entries.Count - 1; i >= 0; i--)
             {
                 var entry = _queue.Entries[i];
+                if (entry.IsVpmEntry) continue; // VPM エントリは親の直下に描画
+
                 DrawEntryRow(entry, i);
+
+                // VPM サブエントリを親の直下にインデント表示
+                for (int j = 0; j < _queue.Entries.Count; j++)
+                {
+                    var sub = _queue.Entries[j];
+                    if (sub.IsVpmEntry && sub.ParentSourceKey == entry.SourceKey)
+                        DrawVpmEntryRow(sub);
+                }
             }
 
             EditorGUILayout.EndScrollView();
@@ -213,7 +244,8 @@ namespace BulkImporter
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
 
-            bool canEdit = !_queue.IsImporting || entry.Status == ImportStatus.Pending;
+            bool isCurrent = entry == _queue.CurrentEntry;
+            bool canEdit = !_queue.IsImporting || !isCurrent;
 
             EditorGUI.BeginDisabledGroup(!canEdit);
             entry.Enabled = EditorGUILayout.Toggle(entry.Enabled, GUILayout.Width(16));
@@ -232,14 +264,37 @@ namespace BulkImporter
             GUILayout.Label(statusLabel, GUILayout.Width(120));
             GUI.contentColor = prevColor;
 
-            EditorGUI.BeginDisabledGroup(_queue.IsImporting && entry.Status == ImportStatus.Importing);
+            EditorGUI.BeginDisabledGroup(isCurrent);
             if (GUILayout.Button("×", GUILayout.Width(24)))
             {
                 PackageQueue.DeleteTemp(entry);
                 _queue.Entries.RemoveAt(index);
+                // VPM サブエントリも削除
+                _queue.Entries.RemoveAll(e => e.IsVpmEntry && e.ParentSourceKey == entry.SourceKey);
                 GUIUtility.ExitGUI();
             }
             EditorGUI.EndDisabledGroup();
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawVpmEntryRow(PackageEntry entry)
+        {
+            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
+
+            GUILayout.Space(28); // インデント（チェックボックス分 + 字下げ）
+            GUILayout.Label("[VPM]", GUILayout.Width(40));
+            GUILayout.Label(entry.DisplayName, GUILayout.ExpandWidth(true));
+
+            string statusLabel = GetVpmStatusLabel(entry.Status);
+            var statusColor = GetStatusColor(entry.Status);
+            var prevColor = GUI.contentColor;
+            GUI.contentColor = statusColor;
+            GUILayout.Label(statusLabel, GUILayout.Width(120));
+            GUI.contentColor = prevColor;
+
+            // 削除ボタンのスペース分を確保（レイアウト揃え）
+            GUILayout.Space(28);
 
             EditorGUILayout.EndHorizontal();
         }
@@ -256,7 +311,11 @@ namespace BulkImporter
             }
             else
             {
-                EditorGUI.BeginDisabledGroup(_queue.Entries.Count == 0);
+                bool hasImportable = false;
+                foreach (var e in _queue.Entries)
+                    if (!e.IsVpmEntry) { hasImportable = true; break; }
+
+                EditorGUI.BeginDisabledGroup(!hasImportable);
                 if (GUILayout.Button("すべてインポート", GUILayout.Width(120)))
                     StartImport();
                 EditorGUI.EndDisabledGroup();
@@ -278,10 +337,52 @@ namespace BulkImporter
         {
             foreach (var entry in _queue.Entries)
             {
-                if (entry.Enabled)
-                    entry.Status = ImportStatus.Pending;
+                if (!entry.Enabled || entry.IsVpmEntry) continue;
+                if (entry.Status == ImportStatus.Done) continue; // 完了済みは再インポートしない
+
+                // ZIP 由来のエントリで temp が消えていたら元 ZIP から再展開
+                if (entry.SourceKey != null && entry.SourceKey.Contains("::") &&
+                    !File.Exists(entry.Path))
+                {
+                    TryReExtractFromZip(entry);
+                }
+
+                entry.Status = ImportStatus.Importing;
             }
             _queue.Start();
+        }
+
+        private static void TryReExtractFromZip(PackageEntry entry)
+        {
+            int sep = entry.SourceKey.IndexOf("::", StringComparison.Ordinal);
+            if (sep < 0) return;
+
+            string zipPath   = entry.SourceKey.Substring(0, sep);
+            string innerPath = entry.SourceKey.Substring(sep + 2);
+
+            if (!File.Exists(zipPath)) return;
+
+            try
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                var zipEntry = archive.GetEntry(innerPath);
+                if (zipEntry == null) return;
+
+                string tempDir  = Path.Combine(Path.GetTempPath(), "BulkImporter");
+                Directory.CreateDirectory(tempDir);
+                string tempFile = Path.Combine(tempDir,
+                    Guid.NewGuid().ToString("N") + "_" + Path.GetFileName(innerPath));
+
+                zipEntry.ExtractToFile(tempFile, overwrite: true);
+                entry.Path     = tempFile.Replace('\\', '/');
+                entry.TempPath = tempFile;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(
+                    $"[BulkImporter] ZIP 再展開に失敗しました: " +
+                    $"{Path.GetFileName(zipPath)} - {e.Message}");
+            }
         }
 
         private void AddFiles()
@@ -336,12 +437,14 @@ namespace BulkImporter
             if (_queue.Entries.Exists(e => e.SourceKey == normalized))
                 return;
 
-            _queue.Entries.Add(new PackageEntry
+            var entry = new PackageEntry
             {
                 Path = normalized,
                 SourceKey = normalized,
                 DisplayName = Path.GetFileNameWithoutExtension(normalized)
-            });
+            };
+            _queue.Entries.Add(entry);
+            AddVpmSubEntries(entry);
         }
 
         private void AddZipFile(string zipPath)
@@ -350,28 +453,30 @@ namespace BulkImporter
             try
             {
                 using var archive = ZipFile.OpenRead(zipPath);
-                foreach (var entry in archive.Entries)
+                foreach (var zipEntry in archive.Entries)
                 {
-                    if (!entry.FullName.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase))
+                    if (!zipEntry.FullName.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    string key = $"{normalizedZip}::{entry.FullName}";
+                    string key = $"{normalizedZip}::{zipEntry.FullName}";
                     if (_queue.Entries.Exists(e => e.SourceKey == key))
                         continue;
 
                     string tempDir = Path.Combine(Path.GetTempPath(), "BulkImporter");
                     Directory.CreateDirectory(tempDir);
                     string tempFile = Path.Combine(tempDir,
-                        Guid.NewGuid().ToString("N") + "_" + entry.Name);
-                    entry.ExtractToFile(tempFile, overwrite: true);
+                        Guid.NewGuid().ToString("N") + "_" + zipEntry.Name);
+                    zipEntry.ExtractToFile(tempFile, overwrite: true);
 
-                    _queue.Entries.Add(new PackageEntry
+                    var entry = new PackageEntry
                     {
                         Path = tempFile.Replace('\\', '/'),
                         SourceKey = key,
-                        DisplayName = Path.GetFileNameWithoutExtension(entry.Name),
+                        DisplayName = Path.GetFileNameWithoutExtension(zipEntry.Name),
                         TempPath = tempFile
-                    });
+                    };
+                    _queue.Entries.Add(entry);
+                    AddVpmSubEntries(entry);
                 }
             }
             catch (Exception e)
@@ -379,6 +484,28 @@ namespace BulkImporter
                 Debug.LogWarning(
                     $"[BulkImporter] ZIP の読み込みに失敗しました: " +
                     $"{Path.GetFileName(zipPath)} - {e.Message}");
+            }
+        }
+
+        private void AddVpmSubEntries(PackageEntry parent)
+        {
+            var config = UnityPackageInspector.TryReadVpmConfig(parent.Path);
+            if (config == null) return;
+
+            foreach (var kv in config.VpmDependencies)
+            {
+                string vpmKey = $"vpm::{parent.SourceKey}::{kv.Key}";
+                if (_queue.Entries.Exists(e => e.SourceKey == vpmKey)) continue;
+
+                _queue.Entries.Add(new PackageEntry
+                {
+                    SourceKey      = vpmKey,
+                    DisplayName    = kv.Key,
+                    IsVpmEntry     = true,
+                    VpmPackageId   = kv.Key,
+                    ParentSourceKey = parent.SourceKey,
+                    Enabled        = false
+                });
             }
         }
 
@@ -392,6 +519,16 @@ namespace BulkImporter
                 case ImportStatus.Failed:     return "[失敗 ✗]";
                 case ImportStatus.Cancelled:  return "[キャンセル]";
                 default:                      return "";
+            }
+        }
+
+        private static string GetVpmStatusLabel(ImportStatus status)
+        {
+            switch (status)
+            {
+                case ImportStatus.Pending: return "[インストール待ち]";
+                case ImportStatus.Done:    return "[インストール済み ✓]";
+                default:                   return GetStatusLabel(status);
             }
         }
 

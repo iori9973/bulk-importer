@@ -1,6 +1,6 @@
 {
   "name": "com.bulk-importer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Bulk Importer",
   "description": ".unitypackage ファイルを複数選択して一括インポートする Unity Editor 拡張です。",
   "unity": "2022.3",

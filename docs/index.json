@@ -5,7 +5,25 @@
   "author": "iori9973",
   "packages": {
     "com.bulk-importer": {
-      "versions": {}
+      "versions": {
+        "1.0.0": {
+          "name": "com.bulk-importer",
+          "version": "1.0.0",
+          "displayName": "Bulk Importer",
+          "description": ".unitypackage ファイルを複数選択して一括インポートする Unity Editor 拡張です。",
+          "unity": "2022.3",
+          "type": "tool",
+          "author": {
+            "name": "iori9973",
+            "url": "https://github.com/iori9973"
+          },
+          "url": "https://github.com/iori9973/bulk-importer/releases/download/v1.0.0/bulk-importer-1.0.0.zip",
+          "changelogUrl": "https://github.com/iori9973/bulk-importer/blob/main/CHANGELOG.md",
+          "dependencies": {},
+          "vpmDependencies": {},
+          "zipSHA256": "0ed72599f22633ab4cf877a099b4741a7ba0f9ec87135c2d20d008e747e97371"
+        }
+      }
     }
   }
 }
