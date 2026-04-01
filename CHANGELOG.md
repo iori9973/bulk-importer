@@ -8,6 +8,15 @@
 
 ---
 
+## [1.1.0] - 2026-04-01
+
+### Added
+- 通知音の音量調整スライダーを追加（0〜1、デフォルト: 0.5）
+
+### Changed
+- Windows の音声再生を winmm.dll PlaySound から PowerShell MediaPlayer に統一し、音量制御に対応
+- Linux の音声再生を aplay から paplay (PulseAudio) に変更し、音量制御に対応
+
 ## [1.0.1] - 2026-02-24
 
 ### Added

@@ -129,6 +129,13 @@ namespace BulkImporter
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Space(18);
+                GUILayout.Label("音量", GUILayout.Width(28));
+                BulkImporterSettings.Volume = EditorGUILayout.Slider(
+                    BulkImporterSettings.Volume, 0f, 1f);
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(18);
                 string current = BulkImporterSettings.AudioFilePath;
                 string newPath = EditorGUILayout.TextField(current, GUILayout.ExpandWidth(true));
                 if (newPath != current)

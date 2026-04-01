@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -8,9 +7,9 @@ namespace BulkImporter
 {
     /// <summary>
     /// OS に応じた方法で音声ファイルを再生する。
-    /// Windows: WAV → winmm.dll PlaySound / その他 → PowerShell + WPF MediaPlayer
+    /// Windows: PowerShell + WPF MediaPlayer（音量制御対応）
     /// macOS  : afplay コマンド（WAV・MP3・AAC・FLAC・AIFF 等対応）
-    /// Linux  : aplay コマンド（WAV のみ）
+    /// Linux  : paplay コマンド（PulseAudio）
     /// </summary>
     internal static class NotificationAudioPlayer
     {
@@ -46,41 +45,29 @@ namespace BulkImporter
 
         private static void PlayPlatformSpecific(string absolutePath)
         {
+            float volume = BulkImporterSettings.Volume;
+            if (volume <= 0f) return;
+
 #if UNITY_EDITOR_WIN
-            bool isWav = string.Equals(Path.GetExtension(absolutePath), ".wav",
-                                       StringComparison.OrdinalIgnoreCase);
-            if (isWav)
-                PlayWindows(absolutePath);
-            else
-                PlayWindowsNonWav(absolutePath);
+            PlayWindows(absolutePath, volume);
 #elif UNITY_EDITOR_OSX
-            PlayMac(absolutePath);
+            PlayMac(absolutePath, volume);
 #else
-            PlayLinux(absolutePath);
+            PlayLinux(absolutePath, volume);
 #endif
         }
 
 #if UNITY_EDITOR_WIN
-        [DllImport("winmm.dll", CharSet = CharSet.Auto)]
-        private static extern bool PlaySound(string pszSound, IntPtr hmod, uint fdwSound);
-
-        private const uint SndFilename  = 0x00020000;
-        private const uint SndAsync     = 0x00000001;
-        private const uint SndNoDefault = 0x00000002;
-
-        private static void PlayWindows(string path)
-        {
-            PlaySound(path, IntPtr.Zero, SndFilename | SndAsync | SndNoDefault);
-        }
-
-        private static void PlayWindowsNonWav(string path)
+        private static void PlayWindows(string path, float volume)
         {
             string uri = new Uri(path).AbsoluteUri.Replace("'", "''");
+            string vol = volume.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
 
             string script =
                 "Add-Type -AssemblyName presentationCore\n" +
                 $"$p = New-Object System.Windows.Media.MediaPlayer\n" +
                 $"$p.Open([uri]'{uri}')\n" +
+                $"$p.Volume = {vol}\n" +
                 "$p.Play()\n" +
                 "Start-Sleep -Milliseconds 500\n" +
                 "$nd = $p.NaturalDuration\n" +
@@ -100,15 +87,18 @@ namespace BulkImporter
         }
 
 #elif UNITY_EDITOR_OSX
-        private static void PlayMac(string path)
+        private static void PlayMac(string path, float volume)
         {
-            System.Diagnostics.Process.Start("afplay", $"\"{path}\"");
+            string vol = volume.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+            System.Diagnostics.Process.Start("afplay", $"-v {vol} \"{path}\"");
         }
 
 #else
-        private static void PlayLinux(string path)
+        private static void PlayLinux(string path, float volume)
         {
-            System.Diagnostics.Process.Start("aplay", $"\"{path}\"");
+            // paplay (PulseAudio) は 0-65536 の範囲で音量を指定
+            int pulseVol = (int)(volume * 65536);
+            System.Diagnostics.Process.Start("paplay", $"--volume={pulseVol} \"{path}\"");
         }
 #endif
     }

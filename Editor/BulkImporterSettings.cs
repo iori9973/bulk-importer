@@ -6,6 +6,7 @@ namespace BulkImporter
     {
         private const string KeySoundEnabled   = "BulkImporter.SoundEnabled";
         private const string KeyAudioFilePath  = "BulkImporter.AudioFilePath";
+        private const string KeyVolume         = "BulkImporter.Volume";
         private const string KeyLastDirectory  = "BulkImporter.LastDirectory";
 
         public static bool SoundEnabled
@@ -18,6 +19,12 @@ namespace BulkImporter
         {
             get => EditorPrefs.GetString(KeyAudioFilePath, "");
             set => EditorPrefs.SetString(KeyAudioFilePath, value);
+        }
+
+        public static float Volume
+        {
+            get => EditorPrefs.GetFloat(KeyVolume, 0.5f);
+            set => EditorPrefs.SetFloat(KeyVolume, UnityEngine.Mathf.Clamp01(value));
         }
 
         public static string LastDirectory
