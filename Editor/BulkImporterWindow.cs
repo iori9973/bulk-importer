@@ -84,6 +84,9 @@ namespace BulkImporter
             if (NotificationAudioPlayer.IsPlaying)
                 Repaint();
 
+            if (!_queue.IsImporting)
+                HandleWindowDragAndDrop();
+
             GUILayout.Label("Unitypackage Bulk Importer", EditorStyles.boldLabel);
             EditorGUILayout.Space(4);
 
@@ -194,14 +197,17 @@ namespace BulkImporter
                 normal = { textColor = EditorGUIUtility.isProSkin ? Color.gray : Color.black }
             };
             GUI.Box(dropArea, "ここにファイル・フォルダ・ZIP をドラッグ＆ドロップ", style);
+        }
 
+        private void HandleWindowDragAndDrop()
+        {
             var evt = Event.current;
-            if (evt.type == EventType.DragUpdated && dropArea.Contains(evt.mousePosition))
+            if (evt.type == EventType.DragUpdated)
             {
                 DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
                 evt.Use();
             }
-            else if (evt.type == EventType.DragPerform && dropArea.Contains(evt.mousePosition))
+            else if (evt.type == EventType.DragPerform)
             {
                 DragAndDrop.AcceptDrag();
                 AddPaths(DragAndDrop.paths);
