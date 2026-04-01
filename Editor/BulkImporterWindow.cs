@@ -81,6 +81,9 @@ namespace BulkImporter
 
         private void OnGUI()
         {
+            if (NotificationAudioPlayer.IsPlaying)
+                Repaint();
+
             GUILayout.Label("Unitypackage Bulk Importer", EditorStyles.boldLabel);
             EditorGUILayout.Space(4);
 
@@ -132,6 +135,11 @@ namespace BulkImporter
                 GUILayout.Label("音量", GUILayout.Width(28));
                 BulkImporterSettings.Volume = EditorGUILayout.Slider(
                     BulkImporterSettings.Volume, 0f, 1f);
+                if (NotificationAudioPlayer.IsPlaying)
+                {
+                    if (GUILayout.Button("■", GUILayout.Width(24)))
+                        NotificationAudioPlayer.Stop();
+                }
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();

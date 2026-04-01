@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,6 +14,22 @@ namespace BulkImporter
     /// </summary>
     internal static class NotificationAudioPlayer
     {
+        private static Process _currentProcess;
+
+        public static bool IsPlaying
+        {
+            get
+            {
+                if (_currentProcess == null) return false;
+                if (_currentProcess.HasExited)
+                {
+                    _currentProcess = null;
+                    return false;
+                }
+                return true;
+            }
+        }
+
         public static void Play()
         {
             if (!BulkImporterSettings.SoundEnabled)
@@ -33,6 +50,7 @@ namespace BulkImporter
 
         public static void Play(string absolutePath)
         {
+            Stop();
             try
             {
                 PlayPlatformSpecific(absolutePath);
@@ -41,6 +59,18 @@ namespace BulkImporter
             {
                 UnityEngine.Debug.LogWarning($"[BulkImporter] 音声の再生に失敗しました: {e.Message}");
             }
+        }
+
+        public static void Stop()
+        {
+            if (_currentProcess == null) return;
+            try
+            {
+                if (!_currentProcess.HasExited)
+                    _currentProcess.Kill();
+            }
+            catch (Exception) { }
+            _currentProcess = null;
         }
 
         private static void PlayPlatformSpecific(string absolutePath)
@@ -76,21 +106,21 @@ namespace BulkImporter
                 "$p.Stop()";
 
             string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
-            var psi = new System.Diagnostics.ProcessStartInfo
+            var psi = new ProcessStartInfo
             {
                 FileName               = "powershell.exe",
                 Arguments              = $"-NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}",
                 UseShellExecute        = false,
                 CreateNoWindow         = true
             };
-            Task.Run(() => System.Diagnostics.Process.Start(psi));
+            _currentProcess = Process.Start(psi);
         }
 
 #elif UNITY_EDITOR_OSX
         private static void PlayMac(string path, float volume)
         {
             string vol = volume.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-            System.Diagnostics.Process.Start("afplay", $"-v {vol} \"{path}\"");
+            _currentProcess = Process.Start("afplay", $"-v {vol} \"{path}\"");
         }
 
 #else
@@ -98,7 +128,7 @@ namespace BulkImporter
         {
             // paplay (PulseAudio) は 0-65536 の範囲で音量を指定
             int pulseVol = (int)(volume * 65536);
-            System.Diagnostics.Process.Start("paplay", $"--volume={pulseVol} \"{path}\"");
+            _currentProcess = Process.Start("paplay", $"--volume={pulseVol} \"{path}\"");
         }
 #endif
     }
