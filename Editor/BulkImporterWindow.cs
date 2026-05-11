@@ -40,11 +40,20 @@ namespace BulkImporter
                 _queue.ImportingEntryIndex = -1;
             }
 
-            // 上記で処理されなかった Importing エントリは待機中に戻す
+            // まだ Importing のエントリが残っていればキューを再開
+            bool hasRemaining = false;
             foreach (var entry in _queue.Entries)
             {
                 if (!entry.IsVpmEntry && entry.Status == ImportStatus.Importing)
-                    entry.Status = ImportStatus.Pending;
+                {
+                    hasRemaining = true;
+                    break;
+                }
+            }
+
+            if (hasRemaining)
+            {
+                _queue.Start();
             }
 
             // VPM パッケージのインストール状態を更新
