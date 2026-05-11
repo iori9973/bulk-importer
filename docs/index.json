@@ -21,7 +21,7 @@
           "changelogUrl": "https://github.com/iori9973/bulk-importer/blob/main/CHANGELOG.md",
           "dependencies": {},
           "vpmDependencies": {},
-          "zipSHA256": "0a56e1f6c5b00704cd41afdb828fcf1f9370a8e5e3841e17403aeb035e102f3f"
+          "zipSHA256": "873080099933b02300e1acd52113fc39fd1f518f5031257c5bf10da03f2cf777"
         },
         "1.3.0": {
           "name": "com.bulk-importer",
